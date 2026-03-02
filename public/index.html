@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Employee Enterprise Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100">
+
+    <!-- LOGIN SCREEN (SSO MOCKUP) -->
+    <div id="login-page" class="min-h-screen flex items-center justify-center">
+        <div class="bg-white p-8 rounded-lg shadow-xl w-96 text-center">
+            <h1 class="text-2xl font-bold mb-6">Enterprise SSO</h1>
+            <p class="text-gray-500 mb-6">Click below to authenticate via Corporate SSO</p>
+            <button onclick="simulateLogin()"
+                class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">
+                Login with SSO
+            </button>
+            <p class="mt-4 text-xs text-red-500">Note: This is a placeholder SSO login.</p>
+        </div>
+    </div>
+
+    <!-- DASHBOARD SCREEN -->
+    <div id="dashboard-page" class="hidden min-h-screen flex">
+        <!-- Sidebar -->
+        <div class="w-64 bg-slate-800 text-white p-6">
+            <h2 class="text-xl font-bold mb-8"> Admin</h2>
+            <nav>
+                <a href="#" class="block py-2 text-blue-400">Manage Employees</a>
+                <a href="#" onclick="logout()" class="block py-2 text-gray-400 hover:text-white mt-10">Logout</a>
+            </nav>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 p-10">
+            <header class="flex justify-between items-center mb-10">
+                <h1 class="text-3xl font-bold">Employee Dashboard</h1>
+                <button onclick="openModal()" class="bg-green-600 text-white px-4 py-2 rounded">+ Add Employee</button>
+            </header>
+
+            <!-- Table -->
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <table class="w-full text-left">
+                    <thead class="bg-gray-50 border-b">
+                        <tr>
+                            <th class="p-4">Name</th>
+                            <th class="p-4">Position</th>
+                            <th class="p-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="employee-table-body">
+                        <!-- Rows injected here -->
+                    </tbody>
+                </table>
+            </div>
+            <p id="api-error" class="text-red-500 mt-4 font-bold"></p>
+        </div>
+    </div>
+
+    <!-- MODAL FOR CREATE/UPDATE -->
+    <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+        <div class="bg-white p-8 rounded-lg w-96">
+            <h2 id="modal-title" class="text-xl font-bold mb-4">Add Employee</h2>
+            <input type="hidden" id="edit-id">
+            <input id="emp-name" type="text" placeholder="Full Name" class="w-full border p-2 mb-4 rounded">
+            <input id="emp-pos" type="text" placeholder="Position" class="w-full border p-2 mb-4 rounded">
+            <div class="flex justify-end gap-2">
+                <button onclick="closeModal()" class="px-4 py-2 text-gray-500">Cancel</button>
+                <button onclick="saveEmployee()" class="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // UI Navigation
+        function simulateLogin() {
+            document.getElementById('login-page').classList.add('hidden');
+            document.getElementById('dashboard-page').classList.remove('hidden');
+            loadEmployees();
+        }
+
+        function logout() {
+            location.reload();
+        }
+
+        function openModal(id = null, name = '', pos = '') {
+            document.getElementById('modal').classList.remove('hidden');
+            document.getElementById('edit-id').value = id;
+            document.getElementById('emp-name').value = name;
+            document.getElementById('emp-pos').value = pos;
+            document.getElementById('modal-title').innerText = id ? 'Edit Employee' : 'Add Employee';
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.add('hidden');
+        }
+
+        // API Interactions
+        async function loadEmployees() {
+            const res = await fetch('/employees');
+            const data = await res.json();
+            const body = document.getElementById('employee-table-body');
+            body.innerHTML = data.map(e => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="p-4">${e.name}</td>
+                    <td class="p-4">${e.position}</td>
+                    <td class="p-4">
+                        <button onclick="openModal(${e.id}, '${e.name}', '${e.position}')" class="text-blue-600 mr-3">Edit</button>
+                        <button onclick="deleteEmployee(${e.id})" class="text-red-600">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function saveEmployee() {
+            const id = document.getElementById('edit-id').value;
+            const name = document.getElementById('emp-name').value;
+            const position = document.getElementById('emp-pos').value;
+            console.log(id);
+            const method = id == null ? 'POST' : 'PATCH';
+            const url = id == null ? '/employees' : `/employees/${id}`;
+
+            const res = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, position })
+            });
+
+            if (res.status === 401) {
+                const err = await res.json();
+                document.getElementById('api-error').innerText = "SSO GUARD BLOCK: " + err.message;
+            } else {
+                document.getElementById('api-error').innerText = "";
+                closeModal();
+                loadEmployees();
+            }
+        }
+
+        async function deleteEmployee(id) {
+            if (confirm('Delete this employee?')) {
+                await fetch(`/employees/${id}`, { method: 'DELETE' });
+                loadEmployees();
+            }
+        }
+    </script>
+</body>
+
+</html>
